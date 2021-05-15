@@ -5,15 +5,11 @@ const { getRandomInt } = require("./utils");
 
 const seeder = (schema) => {
 
-
     /**
      * 
      * - Get array of seed path schemas
-     * 
      * @returns {Array} array of seed ref paths
-     * 
      */
-
     schema.statics.getSeedPaths = function () {
 
         let seedPathArray = [];
@@ -34,17 +30,22 @@ const seeder = (schema) => {
         return seedPathArray;
     }
 
+
     /**
      *  
      * - Seed and create single document
-     * 
      * @param {array} seedPaths 
      * @returns {Promise<object>}
-     * 
      */
+    schema.statics.seedOne = async function (seedPaths) {
 
-    schema.statics.seedOne = function (seedPaths) {
         const newSeed = seedPaths.reduce((acc, path) => {
+            if (path.seedType === "pickOne") return {
+                ...acc,
+                [path.pathname]: stringSeeder[path.seedType](path.seedVar)
+            }
+
+
             return {
                 ...acc,
                 [path.pathname]: path.seedType === "pickOne" ?
@@ -53,18 +54,16 @@ const seeder = (schema) => {
             }
         }, {});
 
-        return this.create(newSeed);
+        return this.create(newSeed)
     }
+
 
     /**
      *  
      *  - Create Seeded Docs
-     * 
      * @param {integer} numberToCreate Number of documents to create
      * @returns {Array} 
-     * 
      */
-
     schema.statics.createSeedDocs = function (numberToCreate = 0) {
 
         if (numberToCreate < 1) return [];
@@ -88,11 +87,8 @@ const seeder = (schema) => {
     /**
      * 
      * - Get array of seed ref path schemas
-     * 
      * @returns {Array} array of seed ref paths
-     * 
      */
-
     schema.statics.getSeedRefPaths = function () {
 
         let refseedArray = [];
@@ -117,12 +113,9 @@ const seeder = (schema) => {
     /**
      *  
      * - Get One ObjectId from ref model
-     * 
      * @param {string} refName Ref Model
      * @returns {Promise<ObjectId>}
-     * 
      */
-
     schema.statics.getOneRef = async function (refName) {
         const collectionCount = await this.db.model(refName).estimatedDocumentCount();
         const skipTo = getRandomInt(0, collectionCount - 1);
@@ -135,13 +128,10 @@ const seeder = (schema) => {
     /**
      * 
      * - Get array of Object Ids from ref model
-     * 
      * @param {string} refName Ref Model
      * @param {integer} count Number of ObjectIds to return
      * @returns {Promise<Array>} Array of ObjectIds
-     * 
      */
-
     schema.statics.getManyRef = async function (refName, count) {
         const collectionCount = await this.db.model(refName).estimatedDocumentCount();
         const skipTo = getRandomInt(0, collectionCount - 1);
@@ -152,23 +142,23 @@ const seeder = (schema) => {
         })
     }
 
+
     /**
      * 
      * - Seed model
-     * 
      * @param {integer} count Number of documents to create
      * @returns {Promise<Array>} resolves to array of new doc ids
-     * 
      */
-
     schema.statics.seed = async function (count) {
         const seedRefPaths = await this.getSeedRefPaths();
 
         // If schema contains Ref paths
         if (seedRefPaths.length > 0) {
+
             const docs = await this.createSeedDocs(count);
-            const savedDocs = await this.create(docs);
-            return Promise.all(savedDocs.map(async (docs) => {
+
+            return await Promise.all(docs.map(async (doc) => {
+
                 // Map through seed ref paths
                 const seedRefs = await Promise.all(seedRefPaths.map(path => {
                     // If Array
@@ -181,23 +171,81 @@ const seeder = (schema) => {
 
 
                 // Create update
-                const seedRefDocs = seedRefs.reduce((acc, path, idx) => {
+                const seedRefDoc = seedRefs.reduce((acc, path, idx) => {
                     return {
                         ...acc,
                         [seedRefPaths[idx].pathname]: path
                     }
                 }, {});
 
-                const updated = await this.findByIdAndUpdate(docs._doc._id, seedRefDocs, { new: true });
-                return updated._id;
+                return this.create({ ...seedRefDoc, ...doc });
             }));
         }
 
 
         const seedPaths = await this.getSeedPaths();
         return Promise.all(Array.from({ length: count }, (v) => {
-            return this.seedOne(seedPaths);
+
+            return this.seedOne(seedPaths).then(res => res)
+                .catch((ex) => {
+                    console.log("Fail 1")
+                    this.seedOne(seedPaths)
+                })
+                .catch(() => {
+                    console.log("Fail 2")
+                    this.seedOne(seedPaths)
+                })
+                .catch(() => {
+                    throw new Error('Failed retrying 3 times');
+                })
         }));
+    }
+
+
+    /**
+     * 
+     * - Return object of registered Models
+     * @returns {object}
+     */
+    schema.statics.getAllModels = function () {
+        return this.db.models;
+    }
+
+
+    /**
+     * 
+     * - Remove all documents from current Model
+     * @returns {Promise<object>}
+     */
+    schema.statics.drop = async function () {
+        return this.deleteMany({});
+    }
+
+
+    /**
+     * 
+     * - Remove all documents from Model name
+     * @param {string} model 
+     * @returns {Promise<object>}
+     */
+    schema.statics.dropModel = async function (model) {
+        return this.model(model).deleteMany({});
+    }
+
+
+    /**
+     * 
+     * - Remove All documents from all registered Models
+     * @returns {Promise<array>}
+     */
+    schema.statics.dropAll = async function () {
+        const models = this.getAllModels();
+        return Promise.all(Object.keys(models).map(modelName => {
+            if (models.hasOwnProperty(modelName))
+                return models[modelName].deleteMany({})
+
+            return Promise.resolve({ n: 0, ok: 1, deletedCount: 0 });
+        }))
     }
 }
 

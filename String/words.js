@@ -12,7 +12,7 @@ function words(wordCount = 1) {
 }
 
 function password() {
-  let wordArray = [];
+  let wordArray = [1];
   for (let x = 0; x < 4; x++) {
     wordArray.push(wordsList[getRandomInt(0, 498)]);
   }
