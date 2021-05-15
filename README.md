@@ -208,3 +208,41 @@ const uploadSchema = new mongoose.Schema(
 
 module.exports = uploadSchema;
 ```
+
+## Mongoose Connection Options
+
+Example
+
+```js
+// options.js
+module.exports = {
+  /**
+   * Connection Settings
+   */
+  //bufferTimeoutMS: 500,   // default 30000
+  autoIndex: true, // true for dev - (false = Don't build indexes)
+  dbName: 'mydb', // db to connect to
+  /**
+   * Tunning Settings
+   */
+  useNewUrlParser: true,
+  useCreateIndex: true,
+  useFindAndModify: false,
+  poolSize: 5, // Default 5 - MAX 10?
+  socketTimeoutMS: 45000, // 30000 by Default (30 seconds), you should set this to 2-3x your longest running operation
+  family: 4, // Use IP4 instead of trying IP6 first
+  //socketTimeoutMS: 0,
+  //keepAlive: true,
+  //reconnectTries: 30
+
+  /**
+   * useUnifiedTopology: true - Options
+   */
+  useUnifiedTopology: true,
+  //
+  //
+  // Raise this if you get a timeout error
+  serverSelectionTimeoutMS: 30000, // Keep trying to send operations for 30 sec - 30000 by Default (30 seconds) -
+  heartbeatFrequencyMS: 30000, //A heartbeat is subject to serverSelectionTimeoutMS
+};
+```
