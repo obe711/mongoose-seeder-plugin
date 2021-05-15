@@ -1,40 +1,27 @@
 
 const stringSeeder = require("./String/index");
-
-
-function randomIntFromInterval(min, max) {
-    min = Math.ceil(min);
-    max = Math.floor(max);
-
-    if (min < max) return Math.floor(Math.random() * (max - min + 1) + min);
-
-    return Math.floor(Math.random() * (min - max + 1) + max);
-}
+const { getRandomInt } = require("./utils");
 
 
 const seeder = (schema) => {
 
-
-    schema.statics.dev = function () {
-        return this.db.model('User').find({ role: "admin" }).select({ _id: 1 })
-    }
-
-
     /**
+     *  
+     *  - Create Seeded Docs
      * 
      * @param {integer} numberToCreate Number of documents to create
      * @returns {Array} 
+     * 
      */
+
     schema.statics.createSeedDocs = function (numberToCreate = 0) {
 
         if (numberToCreate < 1) return [];
-
 
         const seedPaths = [...
             [...Object.keys(schema.paths)
                 .filter(path => schema.paths[path].options.hasOwnProperty("seed"))]
                 .map(seedPath => { return { path: seedPath, seedType: schema.path(seedPath).options.seed, seedVar: schema.path(seedPath).options.hasOwnProperty("enum") ? schema.path(seedPath).options.enum : schema.path(seedPath).options.seed } })];
-
 
         return Array.from({ length: numberToCreate }, (v) => seedPaths.reduce((acc, seed) => {
             return {
@@ -48,10 +35,13 @@ const seeder = (schema) => {
 
 
     /**
+     * 
      * - Get array of seed path schemas
      * 
      * @returns {Array} array of seed ref paths
+     * 
      */
+
     schema.statics.getSeedRefPaths = function () {
 
         let refseedArray = [];
@@ -74,14 +64,17 @@ const seeder = (schema) => {
 
 
     /**
-     *  - Get One Object id from model
+     *  
+     * - Get One ObjectId from ref model
      * 
      * @param {string} refName Ref Model
      * @returns {ObjectId}
+     * 
      */
+
     schema.statics.getOneRef = async function (refName) {
         const collectionCount = await this.db.model(refName).estimatedDocumentCount();
-        const skipTo = randomIntFromInterval(0, collectionCount - 1);
+        const skipTo = getRandomInt(0, collectionCount - 1);
 
         const oneRef = await this.db.model(refName).findOne({}).skip(skipTo).limit(1).select({ _id: 1 });
         return oneRef._id;
@@ -90,13 +83,17 @@ const seeder = (schema) => {
 
     /**
      * 
+     * - Get array of Object Ids from ref model
+     * 
      * @param {string} refName Ref Model
      * @param {integer} count Number of ObjectIds to return
      * @returns {Array} Array of ObjectIds
+     * 
      */
+
     schema.statics.getManyRef = async function (refName, count) {
         const collectionCount = await this.db.model(refName).estimatedDocumentCount();
-        const skipTo = randomIntFromInterval(0, collectionCount - 1);
+        const skipTo = getRandomInt(0, collectionCount - 1);
 
         const manyRef = await this.db.model(refName).find({}).skip(skipTo).limit(count).select({ _id: 1 });
         return manyRef.map(singleRef => {
@@ -106,9 +103,13 @@ const seeder = (schema) => {
 
     /**
      * 
+     * - Seed model
+     * 
      * @param {integer} count Number of documents to create
      * @returns {Promise} resolves to array of new doc ids
+     * 
      */
+
     schema.statics.seed = async function (count) {
         const seedRefPaths = await this.getSeedRefPaths();
         const docs = await this.createSeedDocs(count);
@@ -119,7 +120,7 @@ const seeder = (schema) => {
             const seedRefs = await Promise.all(seedRefPaths.map(path => {
                 // If Array
                 if (Array.isArray(path.seed)) {
-                    return this.getManyRef(path.ref, randomIntFromInterval(path.seed[0], path.seed[1]));
+                    return this.getManyRef(path.ref, getRandomInt(path.seed[0], path.seed[1]));
                 }
                 // If Single
                 return this.getOneRef(path.ref);
