@@ -12,7 +12,14 @@ function words(wordCount = 1) {
 }
 
 function password() {
-  return words(2);
+  let wordArray = [];
+  for (let x = 0; x < 4; x++) {
+    wordArray.push(wordsList[getRandomInt(0, 498)]);
+  }
+
+  let password = wordArray.join('');
+
+  return password.substring(0, 8)
 }
 
 function fileName() {
