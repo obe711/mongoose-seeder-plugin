@@ -1,0 +1,10 @@
+{
+  "name": "mongoose-seeder-plugin",
+  "version": "1.0.0",
+  "description": "Seed DB by adding options to schema",
+  "main": "index.js",
+  "repository": "git@github.com:obe711/mongoose-seeder-plugin.git",
+  "author": "Obediah Klopfenstein <obe711@gmail.com>",
+  "license": "MIT",
+  "private": false
+}
