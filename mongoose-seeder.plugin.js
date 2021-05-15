@@ -5,6 +5,57 @@ const { getRandomInt } = require("./utils");
 
 const seeder = (schema) => {
 
+
+    /**
+     * 
+     * - Get array of seed path schemas
+     * 
+     * @returns {Array} array of seed ref paths
+     * 
+     */
+
+    schema.statics.getSeedPaths = function () {
+
+        let seedPathArray = [];
+
+        schema.eachPath((pathname, schematype) => {
+            if (schematype.options.hasOwnProperty("seed")) {
+                seedPathArray.push({
+                    pathname,
+                    seed: schematype.options.seed,
+                    seedType: schema.path(pathname).options.seed,
+                    seedVar: schema.path(pathname).options.hasOwnProperty("enum") ?
+                        schema.path(pathname).options.enum
+                        : schema.path(pathname).options.seed
+                })
+            }
+        });
+
+        return seedPathArray;
+    }
+
+    /**
+     *  
+     * - Seed and create single document
+     * 
+     * @param {array} seedPaths 
+     * @returns {Promise<object>}
+     * 
+     */
+
+    schema.statics.seedOne = function (seedPaths) {
+        const newSeed = seedPaths.reduce((acc, path) => {
+            return {
+                ...acc,
+                [path.pathname]: path.seedType === "pickOne" ?
+                    stringSeeder[path.seedType](path.seedVar)
+                    : stringSeeder[path.seedType]()
+            }
+        }, {});
+
+        return this.create(newSeed);
+    }
+
     /**
      *  
      *  - Create Seeded Docs
@@ -36,7 +87,7 @@ const seeder = (schema) => {
 
     /**
      * 
-     * - Get array of seed path schemas
+     * - Get array of seed ref path schemas
      * 
      * @returns {Array} array of seed ref paths
      * 
@@ -68,7 +119,7 @@ const seeder = (schema) => {
      * - Get One ObjectId from ref model
      * 
      * @param {string} refName Ref Model
-     * @returns {ObjectId}
+     * @returns {Promise<ObjectId>}
      * 
      */
 
@@ -87,7 +138,7 @@ const seeder = (schema) => {
      * 
      * @param {string} refName Ref Model
      * @param {integer} count Number of ObjectIds to return
-     * @returns {Array} Array of ObjectIds
+     * @returns {Promise<Array>} Array of ObjectIds
      * 
      */
 
@@ -106,37 +157,46 @@ const seeder = (schema) => {
      * - Seed model
      * 
      * @param {integer} count Number of documents to create
-     * @returns {Promise} resolves to array of new doc ids
+     * @returns {Promise<Array>} resolves to array of new doc ids
      * 
      */
 
     schema.statics.seed = async function (count) {
         const seedRefPaths = await this.getSeedRefPaths();
-        const docs = await this.createSeedDocs(count);
-        const savedDocs = await this.create(docs);
 
-        return Promise.all(savedDocs.map(async (docs) => {
-            // Map through seed ref paths
-            const seedRefs = await Promise.all(seedRefPaths.map(path => {
-                // If Array
-                if (Array.isArray(path.seed)) {
-                    return this.getManyRef(path.ref, getRandomInt(path.seed[0], path.seed[1]));
-                }
-                // If Single
-                return this.getOneRef(path.ref);
+        // If schema contains Ref paths
+        if (seedRefPaths.length > 0) {
+            const docs = await this.createSeedDocs(count);
+            const savedDocs = await this.create(docs);
+            return Promise.all(savedDocs.map(async (docs) => {
+                // Map through seed ref paths
+                const seedRefs = await Promise.all(seedRefPaths.map(path => {
+                    // If Array
+                    if (Array.isArray(path.seed)) {
+                        return this.getManyRef(path.ref, getRandomInt(path.seed[0], path.seed[1]));
+                    }
+                    // If Single
+                    return this.getOneRef(path.ref);
+                }));
+
+
+                // Create update
+                const seedRefDocs = seedRefs.reduce((acc, path, idx) => {
+                    return {
+                        ...acc,
+                        [seedRefPaths[idx].pathname]: path
+                    }
+                }, {});
+
+                const updated = await this.findByIdAndUpdate(docs._doc._id, seedRefDocs, { new: true });
+                return updated._id;
             }));
+        }
 
 
-            // Create update
-            const seedRefDocs = seedRefs.reduce((acc, path, idx) => {
-                return {
-                    ...acc,
-                    [seedRefPaths[idx].pathname]: path
-                }
-            }, {});
-
-            const updated = await this.findByIdAndUpdate(docs._doc._id, seedRefDocs, { new: true });
-            return updated._id;
+        const seedPaths = await this.getSeedPaths();
+        return Promise.all(Array.from({ length: count }, (v) => {
+            return this.seedOne(seedPaths);
         }));
     }
 }
